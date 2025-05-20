@@ -74,8 +74,8 @@ module Birdsong
           puts "checking request: #{request.url}"
           puts "for subpage: #{subpage_search}"
           if !response.body.empty? && response.body
-            puts "passed"
             check_passed = true
+
             unless additional_search_parameters.nil?
               puts "checking additional search parameters #{additional_search_parameters}"
               body_to_check = Oj.load(response.body)
@@ -93,6 +93,7 @@ module Birdsong
               check_passed = block.call(JSON.parse(response.body))
             end
 
+            puts "passed" if check_passed == true
             response_body = response.body if check_passed == true
           end
         end
@@ -100,6 +101,7 @@ module Birdsong
         # Eat them
       rescue Birdsong::WebDriverError
       end
+
 
       load_saved_cookies
       # Now that the intercept is set up, we visit the page we want

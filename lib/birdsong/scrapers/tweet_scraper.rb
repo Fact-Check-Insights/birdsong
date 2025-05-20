@@ -19,6 +19,7 @@ module Birdsong
 
       # video slideshows https://www.instagram.com/p/CY7KxwYOFBS/?utm_source=ig_embed&utm_campaign=loading
       # login
+
       if is_logged_in?(id)
         graphql_object = get_logged_in_content_of_subpage_for_id(id)
       else
@@ -74,13 +75,14 @@ module Birdsong
 
       # This has to run last since it switches pages
       user_object = graphql_object["core"]["user_results"]["result"]
+      profile_image_url = user_object["legacy"]["profile_image_url_https"] || user_object["avatar"]["image_url"]
       user = {
         id: user_object["id"],
         name: user_object["legacy"]["name"],
         username: user_object["legacy"]["screen_name"],
         sign_up_date: user_object["legacy"]["created_at"],
         location: user_object["legacy"]["location"],
-        profile_image_url: user_object["legacy"]["profile_image_url_https"],
+        profile_image_url: profile_image_url,
         description: user_object["legacy"]["description"],
         followers_count: user_object["legacy"]["followers_count"],
         following_count: user_object["legacy"]["friends_count"],
@@ -88,7 +90,7 @@ module Birdsong
         listed_count: user_object["legacy"]["listed_count"],
         verified: user_object["legacy"]["verified"],
         url: user_object["legacy"]["url"],
-        profile_image_file_name: Birdsong.retrieve_media(user_object["legacy"]["profile_image_url_https"])
+        profile_image_file_name: Birdsong.retrieve_media(profile_image_url)
       }
 
       page.quit
@@ -127,7 +129,8 @@ module Birdsong
 
     def get_logged_in_content_of_subpage_for_id(id)
       graphql_object = get_content_of_subpage_from_url("https://x.com/jack/status/#{id}", "/TweetDetail") do |response_body|
-        response_body["data"]["threaded_conversation_with_injections_v2"]["instructions"][0]["entries"][0]["content"]["itemContent"]["tweet_results"]["result"]
+        response_body["data"]["threaded_conversation_with_injections_v2"]["instructions"][1]["entries"][0]["content"]["itemContent"]["tweet_results"]["result"]
+
         true
       rescue StandardError
         false
@@ -135,7 +138,7 @@ module Birdsong
 
 
       # The format gets weird for this request
-      graphql_object["data"]["threaded_conversation_with_injections_v2"]["instructions"][0]["entries"][0]["content"]["itemContent"]["tweet_results"]["result"]
+      graphql_object["data"]["threaded_conversation_with_injections_v2"]["instructions"][1]["entries"][0]["content"]["itemContent"]["tweet_results"]["result"]
     rescue Birdsong::NoTweetFoundError
       nil
     end
