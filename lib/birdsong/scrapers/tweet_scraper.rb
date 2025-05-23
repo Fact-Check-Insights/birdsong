@@ -78,17 +78,17 @@ module Birdsong
       profile_image_url = user_object["legacy"]["profile_image_url_https"] || user_object["avatar"]["image_url"]
       user = {
         id: user_object["id"],
-        name: user_object["legacy"]["name"],
-        username: user_object["legacy"]["screen_name"],
-        sign_up_date: user_object["legacy"]["created_at"],
-        location: user_object["legacy"]["location"],
+        name: user_object["core"]["name"],
+        username: user_object["core"]["screen_name"],
+        sign_up_date: user_object["core"]["created_at"],
+        location: user_object["location"]["location"],
         profile_image_url: profile_image_url,
         description: user_object["legacy"]["description"],
         followers_count: user_object["legacy"]["followers_count"],
         following_count: user_object["legacy"]["friends_count"],
         tweet_count: user_object["legacy"]["statuses_count"],
         listed_count: user_object["legacy"]["listed_count"],
-        verified: user_object["legacy"]["verified"],
+        verified: user_object["verification"]["verified"],
         url: user_object["legacy"]["url"],
         profile_image_file_name: Birdsong.retrieve_media(profile_image_url)
       }

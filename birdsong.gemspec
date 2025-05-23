@@ -37,6 +37,7 @@ Gem::Specification.new do |spec|
   spec.add_dependency "selenium-webdriver", "~> 4.31", ">= 4.31.0"
   spec.add_dependency "curb", "~> 1.0", ">= 1.0.5"
   spec.add_dependency "selenium-devtools"
+  spec.add_dependency "rotp"
 
   # Dev dependencies
   spec.add_development_dependency "debug"
