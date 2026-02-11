@@ -8,7 +8,7 @@ PATH
       oj (~> 3.16, >= 3.16.3)
       rotp
       selenium-devtools
-      selenium-webdriver (~> 4.31, >= 4.31.0)
+      selenium-webdriver (~> 4.40, >= 4.40.0)
       typhoeus (~> 1.4.0)
 
 GEM
@@ -31,7 +31,7 @@ GEM
       public_suffix (>= 2.0.2, < 7.0)
     ast (2.4.2)
     backport (1.2.0)
-    base64 (0.2.0)
+    base64 (0.3.0)
     benchmark (0.4.0)
     bigdecimal (3.1.9)
     capybara (3.40.0)
@@ -130,7 +130,7 @@ GEM
       io-console (~> 0.5)
     reverse_markdown (3.0.0)
       nokogiri
-    rexml (3.4.1)
+    rexml (3.4.4)
     rotp (6.3.0)
     rubocop (1.72.2)
       json (~> 2.3)
@@ -173,15 +173,15 @@ GEM
       rubocop-performance (~> 1.11)
       rubocop-rails (~> 2.0)
     ruby-progressbar (1.13.0)
-    rubyzip (2.4.1)
+    rubyzip (3.2.2)
     securerandom (0.4.1)
     selenium-devtools (0.135.0)
       selenium-webdriver (~> 4.2)
-    selenium-webdriver (4.31.0)
+    selenium-webdriver (4.40.0)
       base64 (~> 0.2)
       logger (~> 1.4)
       rexml (~> 3.2, >= 3.2.5)
-      rubyzip (>= 1.2.2, < 3.0)
+      rubyzip (>= 1.2.2, < 4.0)
       websocket (~> 1.0)
     solargraph (0.51.2)
       backport (~> 1.2)
@@ -239,4 +239,4 @@ DEPENDENCIES
   solargraph
 
 BUNDLED WITH
-   2.5.22
+   2.4.19
