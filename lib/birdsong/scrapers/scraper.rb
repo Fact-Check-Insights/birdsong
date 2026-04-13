@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require "base64"
 require "capybara/dsl"
 require "dotenv/load"
 require "oj"
@@ -21,6 +22,7 @@ options.add_argument("--enable-features=NetworkService,NetworkServiceInProcess")
 options.add_argument("user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 13_3_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36")
 options.add_preference "password_manager_enabled", false
 options.add_argument("--user-data-dir=/tmp/tarun_zorki_#{SecureRandom.uuid}")
+options.logging_prefs = { performance: "ALL" }
 
 Capybara.register_driver :selenium_birdsong do |app|
   client = Selenium::WebDriver::Remote::Http::Curb.new
@@ -53,78 +55,73 @@ module Birdsong
     #
     # @returns Hash a ruby hash of the JSON data
     def get_content_of_subpage_from_url(url, subpage_search, additional_search_parameters = nil, &block)
-      # So this is fun:
-      # For pages marked as misinformation we have to use one method (interception of requrest) and
-      # for pages that are not, we can just pull the data straight from the page.
-      #
-      # How do we figure out which is which?... for now we'll just run through both and see where we
-      # go with it.
-
-      # Our user data no longer lives in the graphql object passed initially with the page.
-      # Instead it comes in as part of a subsequent call. This intercepts all calls, checks if it's
-      # the one we want, and then moves on.
+      # Tweet JSON arrives in a later XHR, not the initial HTML. We watch Chrome's
+      # performance log for Network.responseReceived entries whose URL matches
+      # subpage_search, then read the body via CDP Network.getResponseBody once
+      # Network.loadingFinished fires for that request id.
       response_body = nil
+      matching_request_urls = {}
 
-      page.driver.browser.intercept do |request, &continue|
-        # This passes the request forward unmodified, since we only care about the response
-        continue.call(request) && next unless request.url.include?(subpage_search)
+      load_saved_cookies
+      # Drain anything the login navigation already put in the perf log.
+      page.driver.browser.logs.get("performance")
 
-        continue.call(request) do |response|
-          # Check if not a CORS prefetch and finish up if not
-          puts "checking request: #{request.url}"
-          puts "for subpage: #{subpage_search}"
-          if !response.body.empty? && response.body
+      page.driver.browser.navigate.to(url)
+
+      start_time = Time.now
+      sleep(rand(10...20))
+
+      while response_body.nil? && (Time.now - start_time) < 60
+        page.driver.browser.logs.get("performance").each do |entry|
+          message = parse_perf_log_entry(entry)
+          next if message.nil?
+
+          case message["method"]
+          when "Network.responseReceived"
+            req_url = message.dig("params", "response", "url").to_s
+            next unless req_url.include?(subpage_search)
+            matching_request_urls[message.dig("params", "requestId")] = req_url
+          when "Network.loadingFinished"
+            req_id = message.dig("params", "requestId")
+            next unless matching_request_urls.key?(req_id)
+
+            body = fetch_cdp_response_body(req_id)
+            next if body.nil? || body.empty?
+
+            puts "checking request: #{matching_request_urls[req_id]}"
+            puts "for subpage: #{subpage_search}"
             puts "passed"
+
             check_passed = true
             unless additional_search_parameters.nil?
               puts "checking additional search parameters #{additional_search_parameters}"
-              body_to_check = Oj.load(response.body)
+              body_to_check = Oj.load(body)
 
-              search_parameters = additional_search_parameters.split(",")
-              search_parameters.each_with_index do |key, index|
+              additional_search_parameters.split(",").each do |key|
                 break if body_to_check.nil?
 
-                check_passed = false unless body_to_check.has_key?(key)
+                check_passed = false unless body_to_check.is_a?(Hash) && body_to_check.key?(key)
                 body_to_check = body_to_check[key]
               end
             end
 
-            unless check_passed == false || !block_given?
-              check_passed = block.call(JSON.parse(response.body))
+            if check_passed && block_given?
+              check_passed = begin
+                block.call(JSON.parse(body))
+              rescue StandardError
+                false
+              end
             end
 
-            response_body = response.body if check_passed == true
+            if check_passed
+              response_body = body
+              break
+            end
           end
         end
-      rescue Selenium::WebDriver::Error::WebDriverError
-        # Eat them
-      rescue Birdsong::WebDriverError
+
+        sleep(0.1) if response_body.nil?
       end
-
-      load_saved_cookies
-      # Now that the intercept is set up, we visit the page we want
-      page.driver.browser.navigate.to(url)
-      # We wait until the correct intercept is processed or we've waited 60 seconds
-      start_time = Time.now
-      # puts "Waiting.... #{url}"
-
-      sleep(rand(10...20))
-      while response_body.nil? && (Time.now - start_time) < 60
-        sleep(0.1)
-      end
-
-      # if response_body.nil?
-      #   puts "Logging in and refreshing"
-      #   login
-      #   sleep(rand(5..10))
-      #   page.driver.browser.navigate.to(url)
-
-      #   start_time = Time.now
-      #   sleep(rand(10...20))
-      #   while response_body.nil? && (Time.now - start_time) < 60
-      #     sleep(0.1)
-      #   end
-      # end
 
       page.driver.execute_script("window.stop();")
       save_cookies
@@ -135,6 +132,22 @@ module Birdsong
     end
 
   private
+
+    # Chrome's performance log entries are JSON strings wrapping a CDP message.
+    def parse_perf_log_entry(entry)
+      Oj.load(entry.message)["message"]
+    rescue StandardError
+      nil
+    end
+
+    def fetch_cdp_response_body(request_id)
+      result = page.driver.browser.execute_cdp("Network.getResponseBody", requestId: request_id)
+      body = result["body"]
+      return nil if body.nil?
+      result["base64Encoded"] ? Base64.decode64(body) : body
+    rescue Selenium::WebDriver::Error::WebDriverError
+      nil
+    end
 
     ##########
     # Set the session to use a new user folder in the options!
@@ -152,6 +165,7 @@ module Birdsong
       options.add_preference "password_manager_enabled", false
       options.add_argument("--user-data-dir=/tmp/tarun_zorki_#{SecureRandom.uuid}")
       # options.add_argument("--user-data-dir=/tmp/tarun")
+      options.logging_prefs = { performance: "ALL" }
 
       Capybara.register_driver :selenium do |app|
         client = Selenium::WebDriver::Remote::Http::Curb.new
