@@ -93,9 +93,6 @@ module Birdsong
         profile_image_file_name: Birdsong.retrieve_media(profile_image_url)
       }
 
-      page.quit
-
-
       {
         images: images,
         videos: videos,
@@ -110,6 +107,12 @@ module Birdsong
         video_file_type: video_file_type,
         screenshot_file: screenshot_file
       }
+    ensure
+      begin
+        page.quit
+      rescue StandardError => e
+        @@logger.warn("Error quitting tweet scraper page: #{e}")
+      end
     end
 
     def get_logged_out_content_of_subpage_for_id(id)
